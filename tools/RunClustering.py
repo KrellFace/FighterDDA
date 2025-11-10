@@ -1,5 +1,6 @@
 import json
 import os
+from tkinter import simpledialog
 import numpy as np
 import csv
 import statistics
@@ -25,8 +26,9 @@ fight_type_metrics = ["winningPlayerRemainingHP", "numLeadChangesByRatio", "tota
 fight_descriptor_metrics = ["totalTimeSteps", "absoluteStatDifference"]
 metrics_to_normalize_by_timesteps = ["numLeadChangesByRatio", "totalDamageOut", "numDirectorChanges"]
 runs_folder = "output"
-out_folder_name = "Vis_Output_Name"
+out_folder_name = "AIIDE Demo"
 k = 3
+DEMO_MODE = True
 
 
 #metrics_to_normalize_by_timesteps = []
@@ -107,14 +109,6 @@ def get_datamatrix(fights_data, fight_type = True):
     for fight in fights_data:
         fight_data = []
         val_dict = {}
-        #if fight_type:
-        #    val_dict = fight['type_data']
-        #else:
-        #    val_dict = fight['description_data']
-
-        #for key, value in val_dict.items():
-        #    fight_data.append(value)
-
         
         if fight_type:
             for metric in fight_type_metrics:
@@ -197,7 +191,8 @@ def vis_kmeans_elbow(data, out_path, title):
     plt.ylabel('Inertia (within-cluster SSE)')
     plt.title('Elbow Method for Optimal k')
     plt.grid(True)
-    #plt.show()
+    if(DEMO_MODE):
+        plt.show() 
     plt.savefig(f"{out_path}/{title}.png",dpi=300)
     plt.close()
 
@@ -214,7 +209,8 @@ def vis_dbscan_Kdistance(data, out_path, title):
     plt.title("K-distance graph")
     plt.xlabel("Points sorted by distance")
     plt.ylabel("5th nearest neighbor distance")
-    #plt.show()
+    if(DEMO_MODE):
+        plt.show() 
     plt.savefig(f"{out_path}/{title}.png",dpi=300)
     plt.close()
 
@@ -233,11 +229,6 @@ def generate_scatter(data_xy, point_labels, axis_labels_xy, title, out_path, poi
         for i in range(len(point_labels)):
             plt.text(data_xy[i,0] + 0.2, data_xy[i,1], point_labels[i], fontsize=6, alpha=0.5)
 
-    #if(add_convex_hull):
-        #hull = ConvexHull(data_xy)
-        #for simplex in hull.simplices:
-            #plt.plot(data_xy[simplex, 0], data_xy[simplex, 1], 'r-')
-
     if(len(point_class)>0):
         legend_patches = [mpatches.Patch(color=color_map[label], label=label) for label in unique_labels]
         plt.legend(handles=legend_patches, title="Categories")
@@ -251,7 +242,8 @@ def generate_scatter(data_xy, point_labels, axis_labels_xy, title, out_path, poi
     plt.title(title)
 
     # Show the plot
-    #plt.show() 
+    if(DEMO_MODE):
+        plt.show() 
     plt.savefig(f"{out_path}/{title}.png",dpi=300)
     plt.close()
 
@@ -268,23 +260,24 @@ def generate_labeled_era(fights, metrics, cluster_designations, outpath, filelab
             fight_labels.append(fight['fight_name'])
 
         metric_tuples = np.array(metric_tuples)
-        generate_scatter(metric_tuples, fight_labels, [f"{pair[0]}",f"{pair[1]}"],f"{pair[0]} vs {pair[1]}-{filelabel} Scatter", outpath, cluster_designations, True, False, force_zero=True)
+        generate_scatter(metric_tuples, fight_labels, [f"{pair[0]}",f"{pair[1]}"],f"ERA Scatterplot-{pair[0]} vs {pair[1]}-{filelabel}", outpath, cluster_designations, True, False, force_zero=True)
         
-        generate_hexplot(metric_tuples,[f"{pair[0]}",f"{pair[1]}"], f"{pair[0]} vs {pair[1]}-{filelabel} Hexplot", outpath)
+        generate_hexplot(metric_tuples,[f"{pair[0]}",f"{pair[1]}"], f"ERA Hexplot-{pair[0]} vs {pair[1]}-{filelabel}", outpath)
 
         #Generate Individual Vis
-        clusters = list(set(cluster_designations))
-        for cluster in clusters:
-            cluster_tuples = []
-            cluster_labels = []
-            for i in range(len(fights)):
-                if (cluster_designations[i]==cluster):
-                    fight = fights[i]
-                    cluster_tuples.append([fight[pair[0]],fight[pair[1]]])
-                    cluster_labels.append(fight['fight_name'])
-            cluster_tuples = np.array(cluster_tuples)
-            generate_scatter(cluster_tuples, cluster_labels, [f"{pair[0]}",f"{pair[1]}"],f"Cluster-{cluster}-{pair[0]} vs {pair[1]}-{filelabel}", outpath, [], True, False)
-            generate_hexplot(cluster_tuples,[f"{pair[0]}",f"{pair[1]}"], f"Cluster-{cluster}-{pair[0]} vs {pair[1]}-{filelabel} Hexplot", outpath)
+        if(not DEMO_MODE):
+            clusters = list(set(cluster_designations))
+            for cluster in clusters:
+                cluster_tuples = []
+                cluster_labels = []
+                for i in range(len(fights)):
+                    if (cluster_designations[i]==cluster):
+                        fight = fights[i]
+                        cluster_tuples.append([fight[pair[0]],fight[pair[1]]])
+                        cluster_labels.append(fight['fight_name'])
+                cluster_tuples = np.array(cluster_tuples)
+                generate_scatter(cluster_tuples, cluster_labels, [f"{pair[0]}",f"{pair[1]}"],f"Cluster-{cluster}-{pair[0]} vs {pair[1]}-{filelabel}", outpath, [], True, False)
+                generate_hexplot(cluster_tuples,[f"{pair[0]}",f"{pair[1]}"], f"Cluster-{cluster}-{pair[0]} vs {pair[1]}-{filelabel} Hexplot", outpath)
 
 def generate_hexplot(data_xy, axis_labels_xy, title, out_path):
 
@@ -376,9 +369,14 @@ def get_all_data_kmeans(outfolder_name=""):
     generate_scatter(pca_reduced_data, fight_names, [f"PCA 1: {exp_var[0]}",f"PCA 2: {exp_var[1]}"],"PCA Vis-Source Colouring", visuals_output_dir, sources, True, False)
 
     vis_kmeans_elbow(pca_reduced_data, visuals_output_dir, "K-Means Elbow")
-    kmeans_clusters = apply_kmeans(pca_reduced_data, k)
 
-    generate_scatter(pca_reduced_data, fight_names, [f"TSNE 1",f"TSNE 2"],"PCA Vis-KM Colouring", visuals_output_dir, kmeans_clusters, True, False)
+    cluster_count = k
+    if(DEMO_MODE):
+        cluster_count =  simpledialog.askinteger("Define K", "Enter the number of k-means clusters (the X value where you saw the clearest bend):", minvalue=1, maxvalue=10)
+
+    kmeans_clusters = apply_kmeans(pca_reduced_data, cluster_count)
+
+    generate_scatter(pca_reduced_data, fight_names, [f"PCA 1",f"PCA 2"],"PCA Vis-KM Colouring", visuals_output_dir, kmeans_clusters, True, False)
 
     generate_labeled_era(all_fights, fight_descriptor_metrics, sources, visuals_output_dir, 'PCAVer-Source Highlighted')
     generate_labeled_era(all_fights, fight_descriptor_metrics, kmeans_clusters, visuals_output_dir, 'PCAVer-Cluster Highlighted')
@@ -386,7 +384,7 @@ def get_all_data_kmeans(outfolder_name=""):
     get_metric_ranges_for_clusters(all_fights, fight_type_metrics+fight_descriptor_metrics, fight_names, sources, f"{visuals_output_dir}/PCAVer-source_metric_range")
     get_metric_ranges_for_clusters(all_fights, fight_type_metrics+fight_descriptor_metrics, fight_names, kmeans_clusters, f"{visuals_output_dir}/PCAVer-km_cluster_metric_range")
 
-def main():
+def main(demo_mode=False):
     get_all_data_kmeans(out_folder_name)
 
 if __name__ == "__main__":
